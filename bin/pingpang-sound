@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+event="${1:-complete}"
+
+case "$event" in
+  approval)
+    default_sound="/System/Library/Sounds/Glass.aiff"
+    sound="${PINGPANG_APPROVAL_SOUND:-$default_sound}"
+    ;;
+  complete)
+    default_sound="/System/Library/Sounds/Hero.aiff"
+    sound="${PINGPANG_COMPLETE_SOUND:-$default_sound}"
+    ;;
+  *)
+    echo "Usage: pingpang-sound {approval|complete}" >&2
+    exit 64
+    ;;
+esac
+
+if command -v afplay >/dev/null 2>&1 && [ -f "$sound" ]; then
+  nohup afplay "$sound" >/dev/null 2>&1 &
+  exit 0
+fi
+
+if command -v paplay >/dev/null 2>&1 && [ -f "$sound" ]; then
+  nohup paplay "$sound" >/dev/null 2>&1 &
+  exit 0
+fi
+
+# Retain a usable, dependency-free fallback on terminals without a sound daemon.
+printf '\a' >&2
