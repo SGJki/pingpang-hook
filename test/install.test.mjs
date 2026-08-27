@@ -41,7 +41,7 @@ test("installer preserves settings, remains idempotent, and uninstalls only its 
     assert.equal(config.hooks.Stop.filter((group) => group.hooks.some((hook) => hook.command.includes(".pingpang-hook/bin/pingpang-sound"))).length, 1);
   }
   const codex = await json(join(home, ".codex/hooks.json"));
-  assert.equal(codex.hooks.PermissionRequest[0].matcher, "Bash");
+  assert.equal(codex.hooks.PermissionRequest[0].matcher, undefined);
   assert.match(codex.hooks.PermissionRequest[0].hooks[0].command, /codex-approval$/);
   const claude = await json(join(home, ".claude/settings.json"));
   assert.equal(claude.hooks.PermissionRequest[0].matcher, undefined);

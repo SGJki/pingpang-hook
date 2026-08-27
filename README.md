@@ -2,7 +2,7 @@
 
 给 Codex 和 Claude Code 的本地系统声音 Hook：
 
-- Codex 的 `Bash` 命令如果不命中黑名单，自动批准。
+- Codex 的命令型审批请求如果不命中黑名单，自动批准，不限制工具名称。
 - 命中黑名单或非 Codex 审批请求时，播放 `Glass`，继续等待人工审批。
 - 代理完成本轮工作时，播放 `Hero`。
 
@@ -23,7 +23,7 @@ node scripts/install.mjs
 
 Codex 第一次启动时会要求在 `/hooks` 中审阅并信任新 Hook；这是 Codex 的安全机制。
 
-安装后如果已存在旧 Hook 配置，请重新运行安装命令，让配置加入 `Bash` matcher。
+安装后如果已存在旧 Hook 配置，请重新运行安装命令，让旧配置迁移到新的审批模式。
 
 ## 卸载
 
@@ -58,7 +58,7 @@ export PINGPANG_APPROVAL_BLACKLIST=$'deploy\\s+production\nterraform\\s+apply'
 
 | 工具 | 审批提示 | 完成提示 |
 | --- | --- | --- |
-| Codex | `PermissionRequest`（仅 `Bash`） | `Stop` |
+| Codex | `PermissionRequest`（所有命令型请求） | `Stop` |
 | Claude Code | `PermissionRequest` | `Stop` |
 
 `PermissionRequest` 在审批弹窗出现前立即执行。`Stop` 表示该代理已经结束当前响应；它不是退出整个终端会话才触发的事件。

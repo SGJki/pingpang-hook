@@ -64,10 +64,8 @@ function addHook(config, event, scriptPath, platform) {
       ourHandler.command = expectedCommand;
       changed = true;
     }
-    const expectedMatcher = event === "PermissionRequest" && platform === "codex" ? "Bash" : undefined;
-    if (existingGroup.hooks.length === 1 && existingGroup.matcher !== expectedMatcher) {
-      if (expectedMatcher === undefined) delete existingGroup.matcher;
-      else existingGroup.matcher = expectedMatcher;
+    if (existingGroup.hooks.length === 1 && event === "PermissionRequest" && platform === "codex" && existingGroup.matcher) {
+      delete existingGroup.matcher;
       changed = true;
     }
     return changed;
@@ -76,7 +74,6 @@ function addHook(config, event, scriptPath, platform) {
   const group = {
     hooks: [{ type: "command", command: commandFor(scriptPath, event, platform), timeout: 3 }]
   };
-  if (event === "PermissionRequest" && platform === "codex") group.matcher = "Bash";
   config.hooks[event].push(group);
   return true;
 }

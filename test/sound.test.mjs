@@ -17,16 +17,16 @@ function runHook(input, env = {}, mode = "codex-approval") {
   return { stdout: result.stdout, stderr: result.stderr };
 }
 
-const codexBash = (command) => ({
+const codexCommand = (command, toolName = "Bash") => ({
   hook_event_name: "PermissionRequest",
   model: "gpt-5-codex",
   turn_id: "turn-1",
-  tool_name: "Bash",
+  tool_name: toolName,
   tool_input: { command }
 });
 
-test("automatically approves a non-blacklisted Codex Bash request", () => {
-  const result = runHook(codexBash("npm test"), { PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff") });
+test("automatically approves any non-blacklisted Codex command request", () => {
+  const result = runHook(codexCommand("npm test", "Shell"), { PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff") });
   assert.deepEqual(JSON.parse(result.stdout), {
     hookSpecificOutput: {
       hookEventName: "PermissionRequest",
@@ -37,7 +37,7 @@ test("automatically approves a non-blacklisted Codex Bash request", () => {
 });
 
 test("plays the approval signal and falls through for blacklisted commands", () => {
-  const result = runHook(codexBash("git push origin main"), {
+  const result = runHook(codexCommand("git push origin main", "Shell"), {
     PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff")
   });
   assert.equal(result.stdout, "");
@@ -55,7 +55,7 @@ test("keeps non-Codex PermissionRequest behavior as an approval signal", () => {
 });
 
 test("supports additional newline-delimited blacklist patterns", () => {
-  const result = runHook(codexBash("deploy production"), {
+  const result = runHook(codexCommand("deploy production", "Exec"), {
     PINGPANG_APPROVAL_BLACKLIST: "^deploy\\s+production$",
     PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff")
   });

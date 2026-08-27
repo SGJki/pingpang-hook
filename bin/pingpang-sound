@@ -65,7 +65,6 @@ function isBlacklisted(command) {
 
 function shouldAutoApprove(input) {
   if (input?.hook_event_name !== "PermissionRequest") return false;
-  if (input.tool_name !== "Bash") return false;
   const command = input.tool_input?.command;
   return typeof command === "string" && command.length > 0 && !isBlacklisted(command);
 }
