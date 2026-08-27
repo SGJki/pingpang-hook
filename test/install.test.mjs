@@ -30,7 +30,19 @@ test("installer preserves settings, remains idempotent, and uninstalls only its 
     }
   }));
   await mkdir(join(home, ".claude"), { recursive: true });
-  await writeFile(join(home, ".claude", "settings.json"), JSON.stringify({ model: "sonnet", hooks: { Stop: [{ hooks: [{ type: "command", command: "/usr/local/bin/other-stop" }] }] } }));
+  await writeFile(join(home, ".claude", "settings.json"), JSON.stringify({
+    model: "sonnet",
+    hooks: {
+      PermissionRequest: [{
+        hooks: [{
+          type: "command",
+          command: "'/old/.pingpang-hook/bin/pingpang-sound' approval",
+          timeout: 3
+        }]
+      }],
+      Stop: [{ hooks: [{ type: "command", command: "/usr/local/bin/other-stop" }] }]
+    }
+  }));
 
   run("install.mjs", home);
   run("install.mjs", home);
@@ -45,7 +57,7 @@ test("installer preserves settings, remains idempotent, and uninstalls only its 
   assert.match(codex.hooks.PermissionRequest[0].hooks[0].command, /codex-approval$/);
   const claude = await json(join(home, ".claude/settings.json"));
   assert.equal(claude.hooks.PermissionRequest[0].matcher, undefined);
-  assert.match(claude.hooks.PermissionRequest[0].hooks[0].command, /approval$/);
+  assert.match(claude.hooks.PermissionRequest[0].hooks[0].command, /claude-approval$/);
   assert.equal(claude.model, "sonnet");
   assert.equal(claude.hooks.Stop.length, 2);
 

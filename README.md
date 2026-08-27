@@ -2,8 +2,9 @@
 
 给 Codex 和 Claude Code 的本地系统声音 Hook：
 
-- Codex 的命令型审批请求如果不命中黑名单，自动批准，不限制工具名称。
-- 命中黑名单或非 Codex 审批请求时，播放 `Glass`，继续等待人工审批。
+- Codex 和 Claude Code 的命令型审批请求如果不命中黑名单，自动批准，不限制工具名称。
+- 命中黑名单或非命令型审批请求时，播放 `Glass`，继续等待人工审批。
+- Claude Code 处于 plan mode 时从不自动放行，一律提示人工审批。
 - 代理完成本轮工作时，播放 `Hero`。
 
 macOS 使用系统自带 `afplay` 和 `/System/Library/Sounds`，不需要安装依赖。Linux 会尝试 `paplay`，最后回退到终端响铃。
@@ -59,9 +60,11 @@ export PINGPANG_APPROVAL_BLACKLIST=$'deploy\\s+production\nterraform\\s+apply'
 | 工具 | 审批提示 | 完成提示 |
 | --- | --- | --- |
 | Codex | `PermissionRequest`（所有命令型请求） | `Stop` |
-| Claude Code | `PermissionRequest` | `Stop` |
+| Claude Code | `PermissionRequest`（所有命令型请求） | `Stop` |
 
 `PermissionRequest` 在审批弹窗出现前立即执行。`Stop` 表示该代理已经结束当前响应；它不是退出整个终端会话才触发的事件。
+
+Claude Code 的 `PermissionRequest` Hook 需要 Claude Code ≥ 2.0.45；自动放行时审批弹窗被直接跳过，会话中显示为 “Allowed by PermissionRequest hook”。两个平台的放行输出格式相同，黑名单判断逻辑也完全一致。
 
 ## 验证
 

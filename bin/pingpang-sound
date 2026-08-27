@@ -4,8 +4,8 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
 const event = process.argv[2] ?? "complete";
-if (!["approval", "codex-approval", "complete"].includes(event)) {
-  process.stderr.write("Usage: pingpang-sound {approval|complete}\n");
+if (!["approval", "codex-approval", "claude-approval", "complete"].includes(event)) {
+  process.stderr.write("Usage: pingpang-sound {approval|codex-approval|claude-approval|complete}\n");
   process.exit(64);
 }
 
@@ -22,11 +22,12 @@ function soundFor(eventName) {
   switch (eventName) {
     case "approval":
     case "codex-approval":
+    case "claude-approval":
       return process.env.PINGPANG_APPROVAL_SOUND ?? "/System/Library/Sounds/Glass.aiff";
     case "complete":
       return process.env.PINGPANG_COMPLETE_SOUND ?? "/System/Library/Sounds/Hero.aiff";
     default:
-      throw new Error("Usage: pingpang-sound {approval|complete}");
+      throw new Error("Usage: pingpang-sound {approval|codex-approval|claude-approval|complete}");
   }
 }
 
@@ -65,6 +66,9 @@ function isBlacklisted(command) {
 
 function shouldAutoApprove(input) {
   if (input?.hook_event_name !== "PermissionRequest") return false;
+  // Claude Code plan mode is an explicit review state; never auto-approve there.
+  // Codex payloads carry no permission_mode field, so this cannot affect Codex.
+  if (input.permission_mode === "plan") return false;
   const command = input.tool_input?.command;
   return typeof command === "string" && command.length > 0 && !isBlacklisted(command);
 }
@@ -81,7 +85,9 @@ function playSound(sound) {
   process.stderr.write("\u0007");
 }
 
-if (event === "codex-approval") {
+// Codex and Claude Code accept the same PermissionRequest decision JSON, so both
+// approval modes share this branch; the codex-approval path is unchanged.
+if (event === "codex-approval" || event === "claude-approval") {
   const input = readInput();
   if (shouldAutoApprove(input)) {
     process.stdout.write(JSON.stringify({

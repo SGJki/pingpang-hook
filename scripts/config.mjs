@@ -18,7 +18,7 @@ export function shellQuote(value) {
 }
 
 function commandFor(scriptPath, event, platform) {
-  const mode = event === "Stop" ? "complete" : platform === "codex" ? "codex-approval" : "approval";
+  const mode = event === "Stop" ? "complete" : platform === "codex" ? "codex-approval" : "claude-approval";
   return `${shellQuote(scriptPath)} ${mode}`;
 }
 
