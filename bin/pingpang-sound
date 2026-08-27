@@ -2,6 +2,8 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 const event = process.argv[2] ?? "complete";
 if (!["approval", "codex-approval", "claude-approval", "complete"].includes(event)) {
@@ -44,10 +46,29 @@ function readInput() {
   }
 }
 
-function blacklistPatterns() {
+function blacklistPath() {
+  return join(homedir(), ".pingpang-hook", "blacklist");
+}
+
+// Both platforms run this same script, so the file below is a single shared
+// config; it is staged for Claude Code first. To enable it for Codex as well,
+// drop the mode check in blacklistPatterns().
+function filePatterns() {
+  try {
+    return readFileSync(blacklistPath(), "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith("#"));
+  } catch {
+    return [];
+  }
+}
+
+function blacklistPatterns(event) {
   const custom = process.env.PINGPANG_APPROVAL_BLACKLIST ?? "";
   return [
     ...defaultBlacklist,
+    ...(event === "claude-approval" ? filePatterns() : []),
     ...custom
       .split(/\r?\n|,/)
       .map((pattern) => pattern.trim())
@@ -55,22 +76,22 @@ function blacklistPatterns() {
   ];
 }
 
-function isBlacklisted(command) {
+function isBlacklisted(command, event) {
   try {
-    return blacklistPatterns().some((pattern) => new RegExp(pattern, "i").test(command));
+    return blacklistPatterns(event).some((pattern) => new RegExp(pattern, "i").test(command));
   } catch {
     // A malformed policy must never turn into an automatic approval.
     return true;
   }
 }
 
-function shouldAutoApprove(input) {
+function shouldAutoApprove(input, event) {
   if (input?.hook_event_name !== "PermissionRequest") return false;
   // Claude Code plan mode is an explicit review state; never auto-approve there.
   // Codex payloads carry no permission_mode field, so this cannot affect Codex.
   if (input.permission_mode === "plan") return false;
   const command = input.tool_input?.command;
-  return typeof command === "string" && command.length > 0 && !isBlacklisted(command);
+  return typeof command === "string" && command.length > 0 && !isBlacklisted(command, event);
 }
 
 function playSound(sound) {
@@ -89,7 +110,7 @@ function playSound(sound) {
 // approval modes share this branch; the codex-approval path is unchanged.
 if (event === "codex-approval" || event === "claude-approval") {
   const input = readInput();
-  if (shouldAutoApprove(input)) {
+  if (shouldAutoApprove(input, event)) {
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PermissionRequest",

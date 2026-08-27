@@ -15,7 +15,7 @@ macOS 使用系统自带 `afplay` 和 `/System/Library/Sounds`，不需要安装
 node scripts/install.mjs
 ```
 
-安装程序会把音效脚本放到 `~/.pingpang-hook/bin/pingpang-sound`，并以合并方式更新：
+安装程序会把音效脚本放到 `~/.pingpang-hook/bin/pingpang-sound`，首次安装时创建共享黑名单文件 `~/.pingpang-hook/blacklist`（重复安装不覆盖），并以合并方式更新：
 
 - `~/.codex/hooks.json`
 - `~/.claude/settings.json`
@@ -32,7 +32,7 @@ Codex 第一次启动时会要求在 `/hooks` 中审阅并信任新 Hook；这�
 node scripts/uninstall.mjs
 ```
 
-卸载仅删除本项目添加的命令 Hook，不会删除或覆盖已有的其他配置；保留的 `~/.pingpang-hook` 目录可手动删除。
+卸载仅删除本项目添加的命令 Hook，不会删除或覆盖已有的其他配置；保留的 `~/.pingpang-hook` 目录（含黑名单文件）可手动删除。
 
 ## 自定义音效
 
@@ -45,15 +45,23 @@ export PINGPANG_COMPLETE_SOUND=/System/Library/Sounds/Glass.aiff
 
 ## 审批黑名单
 
-Hook 内置以下高风险命令模式：`sudo`、`rm`、`git push`、`git reset --hard`、`git clean`、系统关机/重启、递归 `chmod`，以及将下载内容直接交给 shell 执行。
+Hook 内置以下高风险命令模式：`sudo`、`rm`、`git push`、`git reset --hard`、`git clean`、系统关机/重启、递归 `chmod`，以及将下载内容直接交给 shell 执行。内置模式始终生效。
 
-可以通过环境变量追加正则模式，每行一个（也支持逗号分隔）：
+黑名单配置文件是 `~/.pingpang-hook/blacklist`：两个平台的审批请求都由同一个脚本处理，目标是由这一份文件同时约束两端，保证两边标准永远一致。当前版本先对 Claude Code 启用；Codex 仍只使用"内置模式 + 环境变量"，验证稳定后再切换到同一文件。文件首次安装自动创建，重复安装和卸载都不会覆盖，可放心编辑。每行一个正则，`#` 开头为注释，空行忽略，匹配大小写不敏感：
+
+```
+# 部署生产环境需要人工确认
+deploy\s+production
+terraform\s+apply
+```
+
+也可以继续用环境变量 `PINGPANG_APPROVAL_BLACKLIST` 追加正则模式，每行一个（也支持逗号分隔），它与配置文件、内置模式叠加生效：
 
 ```bash
 export PINGPANG_APPROVAL_BLACKLIST=$'deploy\\s+production\nterraform\\s+apply'
 ```
 
-命令模式区分大小写不敏感。黑名单配置正则格式错误时，Hook 会放弃自动批准并播放提示音。
+黑名单配置正则格式错误时，Hook 会放弃自动批准并播放提示音。
 
 ## 事件映射
 

@@ -45,7 +45,13 @@ test("installer preserves settings, remains idempotent, and uninstalls only its 
   }));
 
   run("install.mjs", home);
+  const blacklistPath = join(home, ".pingpang-hook", "blacklist");
+  assert.match(await readFile(blacklistPath, "utf8"), /^# PingPang Hook/);
+
+  // A user-edited blacklist must survive reinstalls untouched.
+  await writeFile(blacklistPath, "^sentinel\\s+pattern$\n");
   run("install.mjs", home);
+  assert.equal(await readFile(blacklistPath, "utf8"), "^sentinel\\s+pattern$\n");
 
   for (const relativePath of [".codex/hooks.json", ".claude/settings.json"]) {
     const config = await json(join(home, relativePath));
@@ -66,4 +72,6 @@ test("installer preserves settings, remains idempotent, and uninstalls only its 
   assert.equal(cleanedClaude.model, "sonnet");
   assert.equal(cleanedClaude.hooks.Stop.length, 1);
   assert.equal(cleanedClaude.hooks.PermissionRequest, undefined);
+  // Uninstall only removes hooks; the shared blacklist file stays in place.
+  assert.equal(await readFile(blacklistPath, "utf8"), "^sentinel\\s+pattern$\n");
 });

@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 const script = new URL("../bin/pingpang-sound", import.meta.url).pathname;
 const nodePath = process.env.PATH;
+const testHome = mkdtempSync(join(tmpdir(), "pingpang-sound-"));
 
 function runHook(input, env = {}, mode = "codex-approval") {
   const result = spawnSync(script, [mode], {
-    env: { ...process.env, ...env, PATH: nodePath },
+    env: { ...process.env, HOME: testHome, ...env, PATH: nodePath },
     input: JSON.stringify(input),
     encoding: "utf8"
   });
@@ -35,6 +38,11 @@ const claudeCommand = (command, extra = {}) => ({
   tool_input: { command },
   ...extra
 });
+
+function writeBlacklist(content) {
+  mkdirSync(join(testHome, ".pingpang-hook"), { recursive: true });
+  writeFileSync(join(testHome, ".pingpang-hook", "blacklist"), content);
+}
 
 test("automatically approves any non-blacklisted Codex command request", () => {
   const result = runHook(codexCommand("npm test", "Shell"), { PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff") });
@@ -111,6 +119,41 @@ test("never auto-approves Claude Code requests made in plan mode", () => {
   }, "claude-approval");
   assert.equal(result.stdout, "");
   assert.equal(result.stderr, "\u0007");
+});
+
+test("applies the shared blacklist file to Claude Code", () => {
+  writeBlacklist("# shared rule\n\n^deploy\\s+production$\n");
+  const result = runHook(claudeCommand("deploy production"), {
+    PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff")
+  }, "claude-approval");
+  assert.equal(result.stdout, "");
+  assert.equal(result.stderr, "\u0007");
+});
+
+test("keeps Codex on built-in and environment patterns until the file is enabled", () => {
+  writeBlacklist("^deploy\\s+production$\n");
+  const result = runHook(codexCommand("deploy production", "Shell"), {
+    PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff")
+  });
+  assert.deepEqual(JSON.parse(result.stdout), {
+    hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: { behavior: "allow" }
+    }
+  });
+});
+
+test("ignores comments and blank lines in the shared blacklist file", () => {
+  writeBlacklist("# deploy\\s+production\n\n   \n");
+  const result = runHook(claudeCommand("deploy production"), {
+    PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff")
+  }, "claude-approval");
+  assert.deepEqual(JSON.parse(result.stdout), {
+    hookSpecificOutput: {
+      hookEventName: "PermissionRequest",
+      decision: { behavior: "allow" }
+    }
+  });
 });
 
 test("rejects unknown event modes with the original usage exit code", () => {

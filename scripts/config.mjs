@@ -3,7 +3,19 @@ import { dirname, join, resolve } from "node:path";
 
 export const INSTALL_DIR_NAME = ".pingpang-hook";
 export const SCRIPT_NAME = "pingpang-sound";
+export const BLACKLIST_NAME = "blacklist";
 const SCRIPT_TOKEN = `${INSTALL_DIR_NAME}/bin/${SCRIPT_NAME}`;
+
+// Comment-only seed file; the built-in high-risk patterns live in the script
+// itself and always apply, so an untouched seed adds nothing.
+const BLACKLIST_STUB = `# PingPang Hook shared approval blacklist (Codex and Claude Code)
+# One regular expression per line; blank lines and lines starting with # are ignored.
+# Matching is case-insensitive. Built-in high-risk patterns always apply.
+# Patterns from PINGPANG_APPROVAL_BLACKLIST are added on top of this file.
+#
+# Example:
+# deploy\\s+production
+`;
 
 export function parseHomeArgument(argv) {
   const homeIndex = argv.indexOf("--home");
@@ -126,6 +138,14 @@ export async function install({ home, sourceScript }) {
   await copyFile(sourceScript, scriptPath);
   await chmod(scriptPath, 0o755);
 
+  // Never overwrite an edited blacklist; upgrades must preserve user patterns.
+  const blacklistPath = join(installDir, BLACKLIST_NAME);
+  let blacklistCreated = false;
+  if (!(await exists(blacklistPath))) {
+    await writeFile(blacklistPath, BLACKLIST_STUB, "utf8");
+    blacklistCreated = true;
+  }
+
   const updated = [];
   for (const [name, path] of Object.entries(configPaths(home))) {
     const config = await readJson(path);
@@ -136,7 +156,7 @@ export async function install({ home, sourceScript }) {
       updated.push(name);
     }
   }
-  return { scriptPath, updated };
+  return { scriptPath, blacklistPath, blacklistCreated, updated };
 }
 
 export async function uninstall({ home }) {
