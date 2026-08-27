@@ -72,7 +72,7 @@ export PINGPANG_APPROVAL_BLACKLIST=$'deploy\\s+production\nterraform\\s+apply'
 
 `PermissionRequest` 在审批弹窗出现前立即执行。`Stop` 表示该代理已经结束当前响应；它不是退出整个终端会话才触发的事件。
 
-Claude Code 的 `PermissionRequest` Hook 需要 Claude Code ≥ 2.0.45；自动放行时审批弹窗被直接跳过，会话中显示为 “Allowed by PermissionRequest hook”。两个平台的放行输出格式相同，黑名单判断逻辑也完全一致。
+Claude Code 的 `PermissionRequest` Hook 需要 Claude Code ≥ 2.0.45；自动放行时审批弹窗被直接跳过，会话中显示为 “Allowed by PermissionRequest hook”。两个平台的放行输出格式相同；黑名单判断共用同一脚本，但配置文件目前只对 Claude Code 生效（见「审批黑名单」一节）。
 
 ## 验证
 
