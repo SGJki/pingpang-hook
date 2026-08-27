@@ -17,8 +17,9 @@ export function shellQuote(value) {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-function commandFor(scriptPath, event) {
-  return `${shellQuote(scriptPath)} ${event}`;
+function commandFor(scriptPath, event, platform) {
+  const mode = event === "Stop" ? "complete" : platform === "codex" ? "codex-approval" : "approval";
+  return `${shellQuote(scriptPath)} ${mode}`;
 }
 
 function isOurHandler(handler) {
@@ -49,14 +50,34 @@ function removeOurHooks(config) {
   return changed;
 }
 
-function addHook(config, event, scriptPath) {
+function addHook(config, event, scriptPath, platform) {
   config.hooks ??= {};
   if (!Array.isArray(config.hooks[event])) config.hooks[event] = [];
-  if (config.hooks[event].some((group) => Array.isArray(group?.hooks) && group.hooks.some(isOurHandler))) return false;
+  const existingGroup = config.hooks[event].find(
+    (group) => Array.isArray(group?.hooks) && group.hooks.some(isOurHandler)
+  );
+  if (existingGroup) {
+    const expectedCommand = commandFor(scriptPath, event, platform);
+    const ourHandler = existingGroup.hooks.find(isOurHandler);
+    let changed = false;
+    if (ourHandler.command !== expectedCommand) {
+      ourHandler.command = expectedCommand;
+      changed = true;
+    }
+    const expectedMatcher = event === "PermissionRequest" && platform === "codex" ? "Bash" : undefined;
+    if (existingGroup.hooks.length === 1 && existingGroup.matcher !== expectedMatcher) {
+      if (expectedMatcher === undefined) delete existingGroup.matcher;
+      else existingGroup.matcher = expectedMatcher;
+      changed = true;
+    }
+    return changed;
+  }
 
-  config.hooks[event].push({
-    hooks: [{ type: "command", command: commandFor(scriptPath, event === "Stop" ? "complete" : "approval"), timeout: 3 }]
-  });
+  const group = {
+    hooks: [{ type: "command", command: commandFor(scriptPath, event, platform), timeout: 3 }]
+  };
+  if (event === "PermissionRequest" && platform === "codex") group.matcher = "Bash";
+  config.hooks[event].push(group);
   return true;
 }
 
@@ -111,8 +132,8 @@ export async function install({ home, sourceScript }) {
   const updated = [];
   for (const [name, path] of Object.entries(configPaths(home))) {
     const config = await readJson(path);
-    const approvalAdded = addHook(config, "PermissionRequest", scriptPath);
-    const completionAdded = addHook(config, "Stop", scriptPath);
+    const approvalAdded = addHook(config, "PermissionRequest", scriptPath, name);
+    const completionAdded = addHook(config, "Stop", scriptPath, name);
     if (approvalAdded || completionAdded) {
       await writeJson(path, config);
       updated.push(name);

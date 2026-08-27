@@ -1,32 +1,99 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env node
 
-event="${1:-complete}"
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 
-case "$event" in
-  approval)
-    default_sound="/System/Library/Sounds/Glass.aiff"
-    sound="${PINGPANG_APPROVAL_SOUND:-$default_sound}"
-    ;;
-  complete)
-    default_sound="/System/Library/Sounds/Hero.aiff"
-    sound="${PINGPANG_COMPLETE_SOUND:-$default_sound}"
-    ;;
-  *)
-    echo "Usage: pingpang-sound {approval|complete}" >&2
-    exit 64
-    ;;
-esac
+const event = process.argv[2] ?? "complete";
+if (!["approval", "codex-approval", "complete"].includes(event)) {
+  process.stderr.write("Usage: pingpang-sound {approval|complete}\n");
+  process.exit(64);
+}
 
-if command -v afplay >/dev/null 2>&1 && [ -f "$sound" ]; then
-  nohup afplay "$sound" >/dev/null 2>&1 &
-  exit 0
-fi
+const defaultBlacklist = [
+  String.raw`(?:^|[;&|]\s*)sudo(?:\s|$)`,
+  String.raw`(?:^|[;&|]\s*)rm(?:\s|$)`,
+  String.raw`(?:^|[;&|]\s*)git\s+(?:push|reset\s+--hard|clean)(?:\s|$)`,
+  String.raw`(?:^|[;&|]\s*)(?:shutdown|reboot|halt|mkfs|dd)(?:\s|$)`,
+  String.raw`(?:^|[;&|]\s*)chmod\s+-R(?:\s|$)`,
+  String.raw`(?:^|[;&|]\s*)(?:curl|wget)\b[^\n]*\|\s*(?:sh|bash|zsh)(?:\s|$)`
+];
 
-if command -v paplay >/dev/null 2>&1 && [ -f "$sound" ]; then
-  nohup paplay "$sound" >/dev/null 2>&1 &
-  exit 0
-fi
+function soundFor(eventName) {
+  switch (eventName) {
+    case "approval":
+    case "codex-approval":
+      return process.env.PINGPANG_APPROVAL_SOUND ?? "/System/Library/Sounds/Glass.aiff";
+    case "complete":
+      return process.env.PINGPANG_COMPLETE_SOUND ?? "/System/Library/Sounds/Hero.aiff";
+    default:
+      throw new Error("Usage: pingpang-sound {approval|complete}");
+  }
+}
 
-# Retain a usable, dependency-free fallback on terminals without a sound daemon.
-printf '\a' >&2
+function commandExists(command) {
+  return !spawnSync(command, ["--help"], { stdio: "ignore" }).error;
+}
+
+function readInput() {
+  try {
+    const value = readFileSync(0, "utf8").trim();
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+function blacklistPatterns() {
+  const custom = process.env.PINGPANG_APPROVAL_BLACKLIST ?? "";
+  return [
+    ...defaultBlacklist,
+    ...custom
+      .split(/\r?\n|,/)
+      .map((pattern) => pattern.trim())
+      .filter(Boolean)
+  ];
+}
+
+function isBlacklisted(command) {
+  try {
+    return blacklistPatterns().some((pattern) => new RegExp(pattern, "i").test(command));
+  } catch {
+    // A malformed policy must never turn into an automatic approval.
+    return true;
+  }
+}
+
+function shouldAutoApprove(input) {
+  if (input?.hook_event_name !== "PermissionRequest") return false;
+  if (input.tool_name !== "Bash") return false;
+  const command = input.tool_input?.command;
+  return typeof command === "string" && command.length > 0 && !isBlacklisted(command);
+}
+
+function playSound(sound) {
+  const player = process.platform === "darwin" ? "afplay" : "paplay";
+  if (existsSync(sound) && commandExists(player)) {
+    const child = spawn(player, [sound], { detached: true, stdio: "ignore" });
+    child.unref();
+    return;
+  }
+
+  // Retain a usable, dependency-free fallback on terminals without a sound daemon.
+  process.stderr.write("\u0007");
+}
+
+if (event === "codex-approval") {
+  const input = readInput();
+  if (shouldAutoApprove(input)) {
+    process.stdout.write(JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PermissionRequest",
+        decision: { behavior: "allow" }
+      }
+    }));
+  } else {
+    playSound(soundFor(event));
+  }
+} else {
+  playSound(soundFor(event));
+}

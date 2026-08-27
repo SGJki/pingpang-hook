@@ -17,6 +17,18 @@ async function json(path) {
 
 test("installer preserves settings, remains idempotent, and uninstalls only its hooks", async () => {
   const home = await mkdtemp(join(tmpdir(), "pingpang-hook-"));
+  await mkdir(join(home, ".codex"), { recursive: true });
+  await writeFile(join(home, ".codex", "hooks.json"), JSON.stringify({
+    hooks: {
+      PermissionRequest: [{
+        hooks: [{
+          type: "command",
+          command: "'/old/.pingpang-hook/bin/pingpang-sound' approval",
+          timeout: 3
+        }]
+      }]
+    }
+  }));
   await mkdir(join(home, ".claude"), { recursive: true });
   await writeFile(join(home, ".claude", "settings.json"), JSON.stringify({ model: "sonnet", hooks: { Stop: [{ hooks: [{ type: "command", command: "/usr/local/bin/other-stop" }] }] } }));
 
@@ -28,7 +40,12 @@ test("installer preserves settings, remains idempotent, and uninstalls only its 
     assert.equal(config.hooks.PermissionRequest.length, 1);
     assert.equal(config.hooks.Stop.filter((group) => group.hooks.some((hook) => hook.command.includes(".pingpang-hook/bin/pingpang-sound"))).length, 1);
   }
+  const codex = await json(join(home, ".codex/hooks.json"));
+  assert.equal(codex.hooks.PermissionRequest[0].matcher, "Bash");
+  assert.match(codex.hooks.PermissionRequest[0].hooks[0].command, /codex-approval$/);
   const claude = await json(join(home, ".claude/settings.json"));
+  assert.equal(claude.hooks.PermissionRequest[0].matcher, undefined);
+  assert.match(claude.hooks.PermissionRequest[0].hooks[0].command, /approval$/);
   assert.equal(claude.model, "sonnet");
   assert.equal(claude.hooks.Stop.length, 2);
 
