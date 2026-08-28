@@ -5,6 +5,7 @@
 - Codex 和 Claude Code 的命令型审批请求如果不命中黑名单，自动批准，不限制工具名称。
 - 命中黑名单或非命令型审批请求时，播放 `Glass`，继续等待人工审批。
 - Claude Code 处于 plan mode 时从不自动放行，一律提示人工审批。
+- 每次审批请求都会记入审批日志 `~/.pingpang-hook/hook.log`，标注来源平台，便于复盘和确定黑名单。
 - 代理完成本轮工作时，播放 `Hero`。
 
 macOS 使用系统自带 `afplay` 和 `/System/Library/Sounds`，不需要安装依赖。Linux 会尝试 `paplay`，最后回退到终端响铃。
@@ -32,7 +33,7 @@ Codex 第一次启动时会要求在 `/hooks` 中审阅并信任新 Hook；这�
 node scripts/uninstall.mjs
 ```
 
-卸载仅删除本项目添加的命令 Hook，不会删除或覆盖已有的其他配置；保留的 `~/.pingpang-hook` 目录（含黑名单文件）可手动删除。
+卸载仅删除本项目添加的命令 Hook，不会删除或覆盖已有的其他配置；保留的 `~/.pingpang-hook` 目录（含黑名单文件和审批日志）可手动删除。
 
 ## 自定义音效
 
@@ -62,6 +63,32 @@ export PINGPANG_APPROVAL_BLACKLIST=$'deploy\\s+production\nterraform\\s+apply'
 ```
 
 黑名单配置正则格式错误时，Hook 会放弃自动批准并播放提示音。
+
+## 审批日志
+
+两个平台的每次审批请求都会向 `~/.pingpang-hook/hook.log` 追加一条 JSON 记录。两端写在同一份文件里，用 `source` 字段标注来源，便于对照分析、确定黑名单：
+
+```
+{"time":"2026-08-28T07:39:20.070Z","source":"claude","tool":"Bash","command":"npm test","decision":"allow","reason":"auto-approved","pattern":null}
+{"time":"2026-08-28T07:41:02.412Z","source":"codex","tool":"Shell","command":"git push origin main","decision":"manual","reason":"blacklisted","pattern":"(?:^|[;&|]\\s*)git\\s+(?:push|reset\\s+--hard|clean)(?:\\s|$)"}
+```
+
+字段含义：`decision` 为 `allow`（Hook 放行）或 `manual`（响铃、等待人工审批）；`reason` 记录原因，取值 `auto-approved`、`blacklisted`、`plan-mode`、`non-command`、`blacklist-policy-error`；`pattern` 是命中的黑名单正则（未命中为 `null`）。完成音 `complete` 不记日志。
+
+常用查询（使用 `jq`）：
+
+```bash
+# 所有需要人工审批的请求
+jq -r 'select(.decision=="manual") | [.time, .source, .reason, .command] | @tsv' ~/.pingpang-hook/hook.log
+
+# 各黑名单模式的命中次数
+jq -r 'select(.reason=="blacklisted") | .pattern' ~/.pingpang-hook/hook.log | sort | uniq -c
+
+# Codex 一侧自动放行过的全部命令
+jq -r 'select(.source=="codex" and .decision=="allow") | .command' ~/.pingpang-hook/hook.log
+```
+
+日志超过约 5 MB 时滚动为 `hook.log.1`（只保留一份存档）。写日志失败会被静默忽略，绝不影响审批结果；日志在卸载后保留。
 
 ## 事件映射
 

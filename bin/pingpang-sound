@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -46,8 +46,39 @@ function readInput() {
   }
 }
 
+function dataDir() {
+  return join(homedir(), ".pingpang-hook");
+}
+
 function blacklistPath() {
-  return join(homedir(), ".pingpang-hook", "blacklist");
+  return join(dataDir(), "blacklist");
+}
+
+function logPath() {
+  return join(dataDir(), "hook.log");
+}
+
+function sourceFor(eventName) {
+  if (eventName === "codex-approval") return "codex";
+  if (eventName === "claude-approval") return "claude";
+  return "unknown";
+}
+
+// The log only supports blacklist analysis; writing it must never change the
+// approval outcome, so every step stays best-effort.
+function logRequest(entry) {
+  try {
+    const path = logPath();
+    mkdirSync(dataDir(), { recursive: true });
+    try {
+      if (statSync(path).size > 5 * 1024 * 1024) renameSync(path, `${path}.1`);
+    } catch {
+      // Nothing to rotate on the first write.
+    }
+    appendFileSync(path, `${JSON.stringify(entry)}\n`);
+  } catch {
+    // Missing disk space or permissions must not break approval handling.
+  }
 }
 
 // Both platforms run this same script, so the file below is a single shared
@@ -76,22 +107,34 @@ function blacklistPatterns(event) {
   ];
 }
 
-function isBlacklisted(command, event) {
+// Returns the first matching blacklist pattern. A broken policy still blocks:
+// a malformed pattern must never turn into an automatic approval.
+function blacklistMatch(command, event) {
   try {
-    return blacklistPatterns(event).some((pattern) => new RegExp(pattern, "i").test(command));
+    const pattern = blacklistPatterns(event).find((candidate) => new RegExp(candidate, "i").test(command));
+    return pattern === undefined ? null : { pattern };
   } catch {
-    // A malformed policy must never turn into an automatic approval.
-    return true;
+    return { pattern: null, policyError: true };
   }
 }
 
-function shouldAutoApprove(input, event) {
-  if (input?.hook_event_name !== "PermissionRequest") return false;
+function evaluateRequest(input, event) {
+  if (input?.hook_event_name !== "PermissionRequest") return { approve: false, reason: "not-permission-request" };
   // Claude Code plan mode is an explicit review state; never auto-approve there.
   // Codex payloads carry no permission_mode field, so this cannot affect Codex.
-  if (input.permission_mode === "plan") return false;
+  if (input.permission_mode === "plan") return { approve: false, reason: "plan-mode" };
   const command = input.tool_input?.command;
-  return typeof command === "string" && command.length > 0 && !isBlacklisted(command, event);
+  if (typeof command !== "string" || command.length === 0) return { approve: false, reason: "non-command" };
+  const match = blacklistMatch(command, event);
+  if (match) {
+    return {
+      approve: false,
+      reason: match.policyError ? "blacklist-policy-error" : "blacklisted",
+      pattern: match.pattern,
+      command
+    };
+  }
+  return { approve: true, reason: "auto-approved", pattern: null, command };
 }
 
 function playSound(sound) {
@@ -110,7 +153,17 @@ function playSound(sound) {
 // approval modes share this branch; the codex-approval path is unchanged.
 if (event === "codex-approval" || event === "claude-approval") {
   const input = readInput();
-  if (shouldAutoApprove(input, event)) {
+  const verdict = evaluateRequest(input, event);
+  logRequest({
+    time: new Date().toISOString(),
+    source: sourceFor(event),
+    tool: input?.tool_name ?? null,
+    command: verdict.command ?? null,
+    decision: verdict.approve ? "allow" : "manual",
+    reason: verdict.reason,
+    pattern: verdict.pattern ?? null
+  });
+  if (verdict.approve) {
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PermissionRequest",
