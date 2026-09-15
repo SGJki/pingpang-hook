@@ -37,3 +37,10 @@ node scripts/uninstall.mjs [--home dir]
 - 放行输出两端格式一致：`{hookSpecificOutput:{hookEventName:"PermissionRequest",decision:{behavior:"allow"}}}`。
 - 审批日志已对两端启用：所有审批请求记入 `~/.pingpang-hook/hook.log`（JSONL，`source` 字段区分 `codex`/`claude`），用于复盘和确定黑名单。
 - npm 包 `pingpang-hook@0.1.0` 的公开包元数据、`bin` 入口和发布白名单已就绪；正式发布仍待 npm 账号认证后执行，当前不能视为 live verified。
+
+## Project Behavior Extensions
+
+- 修改审批 Hook 时保持 `PermissionRequest` 放行 JSON；黑名单策略错误必须默认人工审批，并用 `npm test` 与代表性 Codex/Claude 输入验证。
+- 保持 Node >=18 ESM、无构建步骤和无生产依赖；验证使用现有 `npm test`。
+- 修改安装行为时保持配置合并、备份创建和幂等性；用 `npm test` 及临时 HOME 的重复运行验证。
+- 保持 Codex 与 Claude 共用黑名单和审批日志路径，并保留来源字段；用临时 HOME 验证两平台输入路径。
