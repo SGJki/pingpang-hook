@@ -12,8 +12,16 @@ macOS 使用系统自带 `afplay` 和 `/System/Library/Sounds`，不需要安装
 
 ## 安装
 
+从 npm 安装并运行：
+
 ```bash
-node scripts/install.mjs
+npx pingpang-hook
+```
+
+默认命令是 `install`，也可以显式指定：
+
+```bash
+npx pingpang-hook install
 ```
 
 安装程序会把音效脚本放到 `~/.pingpang-hook/bin/pingpang-sound`，首次安装时创建共享黑名单文件 `~/.pingpang-hook/blacklist`（重复安装不覆盖），并以合并方式更新：
@@ -30,10 +38,19 @@ Codex 第一次启动时会要求在 `/hooks` 中审阅并信任新 Hook；这�
 ## 卸载
 
 ```bash
-node scripts/uninstall.mjs
+npx pingpang-hook uninstall
 ```
 
 卸载仅删除本项目添加的命令 Hook，不会删除或覆盖已有的其他配置；保留的 `~/.pingpang-hook` 目录（含黑名单文件和审批日志）可手动删除。
+
+如果需要在隔离目录中测试安装器，可以传入备用 home：
+
+```bash
+npx pingpang-hook install --home /tmp/pingpang-hook-home
+npx pingpang-hook uninstall --home /tmp/pingpang-hook-home
+```
+
+源码仓库中的等价开发命令仍然可用：`node scripts/install.mjs` 和 `node scripts/uninstall.mjs`。
 
 ## 自定义音效
 

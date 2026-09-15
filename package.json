@@ -1,9 +1,46 @@
 {
   "name": "pingpang-hook",
   "version": "0.1.0",
-  "private": true,
+  "description": "Install blacklist-aware sound hooks for Codex and Claude Code",
   "type": "module",
+  "bin": {
+    "pingpang-hook": "bin/pingpang-hook.mjs"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SGJki/pingpang-hook.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SGJki/pingpang-hook/issues"
+  },
+  "homepage": "https://github.com/SGJki/pingpang-hook#readme",
+  "keywords": [
+    "codex",
+    "claude-code",
+    "hooks",
+    "cli",
+    "sound",
+    "approval"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "coverage": "c8 --all --include=bin --include=scripts node --test",
+    "prepublishOnly": "npm test"
+  },
+  "devDependencies": {
+    "c8": "^12.0.0"
   }
 }
