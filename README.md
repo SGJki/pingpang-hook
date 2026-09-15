@@ -66,7 +66,7 @@ export PINGPANG_COMPLETE_SOUND=/System/Library/Sounds/Glass.aiff
 
 Hook 内置以下高风险命令模式：`sudo`、`rm`、`git push`、`git reset --hard`、`git clean`、系统关机/重启、递归 `chmod`，以及将下载内容直接交给 shell 执行。内置模式始终生效。
 
-黑名单配置文件是 `~/.pingpang-hook/blacklist`：两个平台的审批请求都由同一个脚本处理，目标是由这一份文件同时约束两端，保证两边标准永远一致。当前版本先对 Claude Code 启用；Codex 仍只使用"内置模式 + 环境变量"，验证稳定后再切换到同一文件。文件首次安装自动创建，重复安装和卸载都不会覆盖，可放心编辑。每行一个正则，`#` 开头为注释，空行忽略，匹配大小写不敏感：
+黑名单配置文件是 `~/.pingpang-hook/blacklist`：两个平台的审批请求都由同一个脚本处理，这一份文件会同时约束 Claude Code 和 Codex，保证两边标准一致。文件首次安装自动创建，重复安装和卸载都不会覆盖，可放心编辑。每行一个正则，`#` 开头为注释，空行忽略，匹配大小写不敏感：
 
 ```
 # 部署生产环境需要人工确认
@@ -117,7 +117,7 @@ jq -r 'select(.source=="codex" and .decision=="allow") | .command' ~/.pingpang-h
 
 `PermissionRequest` 在审批弹窗出现前立即执行。`Stop` 表示该代理已经结束当前响应；它不是退出整个终端会话才触发的事件。
 
-Claude Code 的 `PermissionRequest` Hook 需要 Claude Code ≥ 2.0.45；自动放行时审批弹窗被直接跳过，会话中显示为 “Allowed by PermissionRequest hook”。两个平台的放行输出格式相同；黑名单判断共用同一脚本，但配置文件目前只对 Claude Code 生效（见「审批黑名单」一节）。
+Claude Code 的 `PermissionRequest` Hook 需要 Claude Code ≥ 2.0.45；自动放行时审批弹窗被直接跳过，会话中显示为 “Allowed by PermissionRequest hook”。两个平台的放行输出格式相同，黑名单判断和共享配置也由同一脚本执行。
 
 ## 验证
 

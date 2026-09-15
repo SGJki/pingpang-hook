@@ -130,17 +130,13 @@ test("applies the shared blacklist file to Claude Code", () => {
   assert.equal(result.stderr, "\u0007");
 });
 
-test("keeps Codex on built-in and environment patterns until the file is enabled", () => {
+test("applies the shared blacklist file to Codex", () => {
   writeBlacklist("^deploy\\s+production$\n");
   const result = runHook(codexCommand("deploy production", "Shell"), {
     PINGPANG_APPROVAL_SOUND: join("/tmp", "missing.aiff")
   });
-  assert.deepEqual(JSON.parse(result.stdout), {
-    hookSpecificOutput: {
-      hookEventName: "PermissionRequest",
-      decision: { behavior: "allow" }
-    }
-  });
+  assert.equal(result.stdout, "");
+  assert.equal(result.stderr, "\u0007");
 });
 
 test("ignores comments and blank lines in the shared blacklist file", () => {

@@ -82,8 +82,7 @@ function logRequest(entry) {
 }
 
 // Both platforms run this same script, so the file below is a single shared
-// config; it is staged for Claude Code first. To enable it for Codex as well,
-// drop the mode check in blacklistPatterns().
+// config applied consistently to both approval modes.
 function filePatterns() {
   try {
     return readFileSync(blacklistPath(), "utf8")
@@ -95,11 +94,11 @@ function filePatterns() {
   }
 }
 
-function blacklistPatterns(event) {
+function blacklistPatterns() {
   const custom = process.env.PINGPANG_APPROVAL_BLACKLIST ?? "";
   return [
     ...defaultBlacklist,
-    ...(event === "claude-approval" ? filePatterns() : []),
+    ...filePatterns(),
     ...custom
       .split(/\r?\n|,/)
       .map((pattern) => pattern.trim())
@@ -109,9 +108,9 @@ function blacklistPatterns(event) {
 
 // Returns the first matching blacklist pattern. A broken policy still blocks:
 // a malformed pattern must never turn into an automatic approval.
-function blacklistMatch(command, event) {
+function blacklistMatch(command) {
   try {
-    const pattern = blacklistPatterns(event).find((candidate) => new RegExp(candidate, "i").test(command));
+    const pattern = blacklistPatterns().find((candidate) => new RegExp(candidate, "i").test(command));
     return pattern === undefined ? null : { pattern };
   } catch {
     return { pattern: null, policyError: true };
@@ -125,7 +124,7 @@ function evaluateRequest(input, event) {
   if (input.permission_mode === "plan") return { approve: false, reason: "plan-mode" };
   const command = input.tool_input?.command;
   if (typeof command !== "string" || command.length === 0) return { approve: false, reason: "non-command" };
-  const match = blacklistMatch(command, event);
+  const match = blacklistMatch(command);
   if (match) {
     return {
       approve: false,

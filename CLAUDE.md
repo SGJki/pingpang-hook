@@ -24,17 +24,16 @@ node scripts/uninstall.mjs [--home dir]
 
 关键不变量（改动时必须保持）：
 
-1. `codex-approval` 的外部行为不允许变化——它已被线上 `~/.codex/hooks.json` 使用。
+1. `codex-approval` 的 Hook 输出协议不允许变化——它已被线上 `~/.codex/hooks.json` 使用；黑名单策略由共享配置统一约束两端。
 2. 黑名单正则出错时只能「不放行 + 响铃」，绝不能变成自动批准。
 3. 安装器幂等：重复运行不新增、不破坏用户已有配置；首次变更前留 `.pingpang-hook.bak`。
 4. 平台配置路径：Codex `~/.codex/hooks.json`；Claude Code `~/.claude/settings.json`；共享数据在 `~/.pingpang-hook/`（脚本 + `blacklist` + `hook.log` 审批日志）。
-5. 黑名单来源按叠加顺序：内置模式（始终生效）→ `~/.pingpang-hook/blacklist`（目前仅 `claude-approval` 读取）→ `PINGPANG_APPROVAL_BLACKLIST` 环境变量。
+5. 黑名单来源按叠加顺序：内置模式（始终生效）→ `~/.pingpang-hook/blacklist`（Claude Code 与 Codex 均读取）→ `PINGPANG_APPROVAL_BLACKLIST` 环境变量。
 6. 审批日志只进文件、不进审批链路：每次审批请求向 `~/.pingpang-hook/hook.log` 追加一行 JSON（`source` 区分平台）；写日志失败必须静默忽略，绝不能改变 stdout/stderr/退出码或审批决定；超过约 5 MB 时滚动为 `hook.log.1`。
 
 ## 当前状态与下一步
 
-- Claude Code 已启用全部机制（自动放行 + 黑名单文件 + plan mode 保护）。
-- Codex 仅启用自动放行；**有意暂不读取黑名单文件**，待用户验证稳定后放开：去掉 `bin/pingpang-sound` 中 `blacklistPatterns()` 里的 `event === "claude-approval"` 门控（代码内有注释标记）。
+- Claude Code 与 Codex 均启用全部机制（自动放行 + 共享黑名单文件；Claude Code 额外有 plan mode 保护）。
 - 放行输出两端格式一致：`{hookSpecificOutput:{hookEventName:"PermissionRequest",decision:{behavior:"allow"}}}`。
 - 审批日志已对两端启用：所有审批请求记入 `~/.pingpang-hook/hook.log`（JSONL，`source` 字段区分 `codex`/`claude`），用于复盘和确定黑名单。
 - npm 包 `pingpang-hook@0.1.0` 的公开包元数据、`bin` 入口和发布白名单已就绪；正式发布仍待 npm 账号认证后执行，当前不能视为 live verified。
