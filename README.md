@@ -12,7 +12,7 @@ macOS 使用系统自带 `afplay` 和 `/System/Library/Sounds`，不需要安装
 
 ## 安装
 
-从 npm 安装并运行：
+npm 包发布后，可直接安装并运行：
 
 ```bash
 npx pingpang-hook
@@ -51,6 +51,7 @@ npx pingpang-hook uninstall --home /tmp/pingpang-hook-home
 ```
 
 源码仓库中的等价开发命令仍然可用：`node scripts/install.mjs` 和 `node scripts/uninstall.mjs`。
+当前 `pingpang-hook@0.1.0` 尚待 npm 账号认证后正式发布；在发布完成前请使用上述源码命令。
 
 ## 自定义音效
 

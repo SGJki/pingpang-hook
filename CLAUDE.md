@@ -5,16 +5,19 @@
 ## 运行
 
 ```bash
-npm test                              # node:test，18 个用例
-node scripts/install.mjs [--home dir] # 安装/迁移到真实或指定 HOME
+npm test                                      # node:test，22 个用例
+npx pingpang-hook [install] [--home dir]      # 安装/迁移到真实或指定 HOME
+npx pingpang-hook uninstall [--home dir]
+node scripts/install.mjs [--home dir]         # 源码仓库中的等价入口
 node scripts/uninstall.mjs [--home dir]
 ```
 
-无构建步骤、无依赖；脚本要求 Node ≥ 18（ESM、`node:` 前缀导入）。
+无构建步骤、无生产依赖；开发测试使用 `c8`。脚本要求 Node ≥ 18（ESM、`node:` 前缀导入）。
 
 ## 目录与约定
 
 - `bin/pingpang-sound` — Hook 本体。按 `argv[2]` 分模式：`codex-approval`、`claude-approval`（黑名单判断 + 放行 JSON + 审批日志）、`approval`（仅响铃的遗留模式）、`complete`（完成音）。
+- `bin/pingpang-hook.mjs` — npm/npx 公共 CLI；默认 `install`，支持 `uninstall`、`--home` 和帮助信息。
 - `scripts/config.mjs` — 安装/卸载逻辑；对用户配置**合并而非覆盖**，已有命令与期望不一致时原地迁移。
 - `scripts/install.mjs` / `scripts/uninstall.mjs` — CLI 入口。
 - `test/` — 冒烟式测试：通过 `spawnSync` 直接驱动脚本，断言 stdout/退出码；测试里把 `HOME` 固定到临时目录。
@@ -34,3 +37,4 @@ node scripts/uninstall.mjs [--home dir]
 - Codex 仅启用自动放行；**有意暂不读取黑名单文件**，待用户验证稳定后放开：去掉 `bin/pingpang-sound` 中 `blacklistPatterns()` 里的 `event === "claude-approval"` 门控（代码内有注释标记）。
 - 放行输出两端格式一致：`{hookSpecificOutput:{hookEventName:"PermissionRequest",decision:{behavior:"allow"}}}`。
 - 审批日志已对两端启用：所有审批请求记入 `~/.pingpang-hook/hook.log`（JSONL，`source` 字段区分 `codex`/`claude`），用于复盘和确定黑名单。
+- npm 包 `pingpang-hook@0.1.0` 的公开包元数据、`bin` 入口和发布白名单已就绪；正式发布仍待 npm 账号认证后执行，当前不能视为 live verified。
